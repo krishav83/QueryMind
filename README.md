@@ -29,7 +29,7 @@ QueryMind addresses these issues through a decoupled FastAPI + Streamlit archite
 ## Key Features
 
 - **No Bundled Sample Database:** Starts clean with a welcome screen requiring users to upload their own SQLite databases.
-- **Single & Multi-File SQLite Upload:** Upload a single file or **10–15** `.db`, `.sqlite`, or `.sqlite3` files simultaneously via drag-and-drop or file browser (max 25 MB per file, max 100 MB per batch).
+- **Single & Multi-File SQLite Upload:** Upload 1–15 `.db`, `.sqlite`, or `.sqlite3` files simultaneously via drag-and-drop or file browser (max 25 MB per file, max 100 MB per batch).
 - **Independent Per-File Validation:** Checks file extensions, filename safety/path traversal, 16-byte SQLite 3 headers, database readability, and presence of at least one user table—one invalid file never blocks valid files in the same batch.
 - **Database Library & Live Switching:** View uploaded databases (filename, status, size, table count), select an active database, switch between uploaded databases without restarting, disconnect, or refresh schemas.
 - **Automatic Schema Discovery:** Discovers tables, column names, types, nullability, primary keys, and foreign keys via SQLAlchemy.
@@ -110,6 +110,7 @@ For full component descriptions and a Mermaid diagram, see **[docs/architecture.
 - SQLite `set_authorizer()` protections operate at SQLite statement preparation time and do **not** provide row-level or column-level access control.
 - Query timeouts and result limits reduce but do **not** eliminate all possible resource-exhaustion vectors (for example, expensive cross-joins or complex schemas during upload inspection).
 - The application currently lacks authentication, rate limiting, and multi-user session isolation; backend state is process-global. Do **not** expose it directly on a public or shared network.
+- **External LLM Data Transfer:** When Gemini mode is enabled, the user's natural-language question and structural database metadata are sent to Google's Gemini API. Database row contents are not included in prompts by default. Avoid including sensitive information in questions sent to external LLM providers.
 - Uploaded database files in `data/uploads/` persist on disk until manually removed.
 
 ---
@@ -117,22 +118,40 @@ For full component descriptions and a Mermaid diagram, see **[docs/architecture.
 ## Installation Instructions (Windows PowerShell)
 
 1. **Clone the repository and enter the project directory:**
+
    ```powershell
-   git clone <your-repo-url>
+   git clone https://github.com/krishav83/QueryMind.git
    cd QueryMind
    ```
 
 2. **Create and activate a Python 3.11+ virtual environment:**
+
    ```powershell
    python -m venv .venv
    .\.venv\Scripts\Activate.ps1
    ```
 
-3. **Install QueryMind and dependencies:**
+   If PowerShell blocks script execution, run:
+
    ```powershell
-   .\.venv\Scripts\python.exe -m pip install -e ".[llm,dev]"
+   Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
    ```
-   *(For offline deterministic fallback mode without the Gemini SDK, run `.\.venv\Scripts\python.exe -m pip install -e ".[dev]"`.)*
+
+   Then activate the virtual environment again.
+
+3. **Install QueryMind and its dependencies:**
+
+   **With Gemini LLM support and development tools:**
+
+   ```powershell
+   python -m pip install -e ".[llm,dev]"
+   ```
+
+   **Without Gemini SDK (deterministic fallback mode):**
+
+   ```powershell
+   python -m pip install -e ".[dev]"
+   ```
 
 ---
 
@@ -157,10 +176,20 @@ Copy-Item .env.example .env
 | `QUERYMIND_API_HOST` | `127.0.0.1` | FastAPI bind host |
 | `QUERYMIND_API_PORT` | `8001` | FastAPI bind port (kept on `8001` so `8000` stays free) |
 | `QUERYMIND_API_URL` | `http://127.0.0.1:8001` | Backend URL used by the Streamlit frontend |
+### Enabling Google Gemini
+
+To enable AI-powered SQL generation using Google Gemini, configure the following values in your `.env` file:
+
+```env
+QUERYMIND_LLM_PROVIDER=gemini
+QUERYMIND_GEMINI_API_KEY=your_gemini_api_key
+```
+
+Replace `your_gemini_api_key` with your own API key. Keep your `.env` file private and never commit it to GitHub.
+
+If no Gemini API key is configured, QueryMind can operate using its deterministic fallback provider.
 
 > **Windows Tip:** Never commit `.env` to Git. If specifying file paths in `.env` on Windows, use forward slashes (`data/uploads`) or unquoted paths rather than double-quoted backslashes.
-
----
 
 ## Starting the Application (Windows PowerShell)
 
@@ -216,8 +245,8 @@ All automated tests use isolated temporary directories and temporary SQLite data
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest --cov=src/querymind --cov-report=term-missing -v
-.\.venv\Scripts\python.exe -m ruff check src tests data
-.\.venv\Scripts\python.exe -m ruff format --check src tests data
+.\.venv\Scripts\python.exe -m ruff check src tests
+.\.venv\Scripts\python.exe -m ruff format --check src tests
 ```
 
 ---
