@@ -24,12 +24,13 @@ htmlcov/
 .env.*
 !.env.example
 
-# Local SQLite databases
+# Local SQLite databases and generated data
 *.db
 *.sqlite
 *.sqlite3
 data/*.db
 data/uploads/
+data/seed_sample_db.py
 
 # IDE / OS
 .vscode/
